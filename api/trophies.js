@@ -2,7 +2,7 @@ const GITHUB_API = "https://api.github.com/graphql";
 
 /*
 |--------------------------------------------------------------------------
-| GitHub Achievement Definitions
+| GitHub Achievements
 |--------------------------------------------------------------------------
 */
 
@@ -48,7 +48,7 @@ const TROPHIES = [
     title: "Pull Master",
     description: "Created pull requests on GitHub",
     value: (s) => s.pullRequests,
-    target: 10,
+    target: 5,
     label: "Pull Requests",
   },
 
@@ -119,7 +119,7 @@ const TROPHIES = [
 
 /*
 |--------------------------------------------------------------------------
-| XML Escape Helper
+| XML Escape
 |--------------------------------------------------------------------------
 */
 
@@ -135,14 +135,11 @@ function escapeXml(value) {
 
 /*
 |--------------------------------------------------------------------------
-| Text Wrapping
+| Description Text Wrapping
 |--------------------------------------------------------------------------
-|
-| Prevents long descriptions from touching neighboring cards.
-|
 */
 
-function wrapText(text, maxLength = 29) {
+function wrapText(text, maxLength = 28) {
   const words = text.split(" ");
   const lines = [];
 
@@ -221,8 +218,10 @@ async function githubGraphQL(query, variables) {
 */
 
 async function getGitHubStats(username) {
+
   const query = `
     query($login: String!) {
+
       user(login: $login) {
 
         repositories(
@@ -230,6 +229,7 @@ async function getGitHubStats(username) {
           ownerAffiliations: OWNER
           privacy: PUBLIC
         ) {
+
           totalCount
 
           nodes {
@@ -237,23 +237,39 @@ async function getGitHubStats(username) {
           }
         }
 
+
+        /*
+         * Actual pull requests authored by this user
+         */
+
+        pullRequests(
+          first: 1
+          states: [OPEN, CLOSED]
+        ) {
+          totalCount
+        }
+
+
+        /*
+         * Contribution statistics
+         */
+
         contributionsCollection {
 
           totalCommitContributions
 
           restrictedContributionsCount
 
+
           issueContributions(first: 1) {
             totalCount
           }
 
-          pullRequestContributions(first: 1) {
-            totalCount
-          }
 
           repositoryContributions(first: 1) {
             totalCount
           }
+
 
           contributionCalendar {
             totalContributions
@@ -263,6 +279,7 @@ async function getGitHubStats(username) {
     }
   `;
 
+
   const data = await githubGraphQL(
     query,
     {
@@ -270,7 +287,9 @@ async function getGitHubStats(username) {
     }
   );
 
+
   const user = data.user;
+
 
   if (!user) {
     throw new Error(
@@ -278,18 +297,20 @@ async function getGitHubStats(username) {
     );
   }
 
+
   const contributions =
     user.contributionsCollection;
 
 
   /*
-   * Calculate total stars
+   * Calculate repository stars
    */
 
   const stars =
     user.repositories.nodes.reduce(
-      (total, repository) =>
-        total + repository.stargazerCount,
+      (total, repository) => {
+        return total + repository.stargazerCount;
+      },
       0
     );
 
@@ -304,31 +325,44 @@ async function getGitHubStats(username) {
 
 
   /*
-   * Return all statistics
+   * Actual PR count
+   *
+   * This is NOT the contribution count.
+   * It represents pull requests authored by the user.
+   */
+
+  const pullRequests =
+    user.pullRequests.totalCount;
+
+
+  /*
+   * Return statistics
    */
 
   return {
+
     repositories:
       user.repositories.totalCount,
 
     stars,
 
     contributions:
-      contributions.contributionCalendar
+      contributions
+        .contributionCalendar
         .totalContributions,
 
     commits,
 
     issues:
-      contributions.issueContributions
+      contributions
+        .issueContributions
         .totalCount,
 
-    pullRequests:
-      contributions.pullRequestContributions
-        .totalCount,
+    pullRequests,
 
     repositoryContributions:
-      contributions.repositoryContributions
+      contributions
+        .repositoryContributions
         .totalCount,
   };
 }
@@ -336,14 +370,14 @@ async function getGitHubStats(username) {
 
 /*
 |--------------------------------------------------------------------------
-| Create Trophy SVG
+| Create SVG
 |--------------------------------------------------------------------------
 */
 
 function createSvg(username, stats) {
 
   /*
-   * Overall SVG dimensions
+   * SVG dimensions
    */
 
   const svgWidth = 1500;
@@ -351,7 +385,10 @@ function createSvg(username, stats) {
 
 
   /*
-   * Grid configuration
+   * Grid
+   *
+   * 6 columns
+   * 2 rows
    */
 
   const columns = 6;
@@ -384,7 +421,7 @@ function createSvg(username, stats) {
 
 
   /*
-   * Trophy card SVG
+   * Build cards
    */
 
   let cards = "";
@@ -392,14 +429,15 @@ function createSvg(username, stats) {
 
   TROPHIES.forEach((trophy, index) => {
 
-    const column = index % columns;
+    const column =
+      index % columns;
 
     const row =
       Math.floor(index / columns);
 
 
     /*
-     * Calculate card position
+     * Card position
      */
 
     const x =
@@ -412,7 +450,7 @@ function createSvg(username, stats) {
 
 
     /*
-     * Current statistic
+     * Achievement value
      */
 
     const rawValue =
@@ -431,7 +469,7 @@ function createSvg(username, stats) {
 
 
     /*
-     * Dynamic colors
+     * Colors based on status
      */
 
     const background =
@@ -477,12 +515,12 @@ function createSvg(username, stats) {
     const descriptionLines =
       wrapText(
         trophy.description,
-        29
+        28
       );
 
 
     /*
-     * Generate description SVG
+     * Generate description
      */
 
     const descriptionSvg =
@@ -503,13 +541,13 @@ function createSvg(username, stats) {
 
 
     /*
-     * Generate complete card
+     * Generate card
      */
 
     cards += `
       <g>
 
-        <!-- Card background -->
+        <!-- Card -->
 
         <rect
           x="${x}"
@@ -523,7 +561,7 @@ function createSvg(username, stats) {
         />
 
 
-        <!-- Trophy icon -->
+        <!-- Icon -->
 
         <text
           x="${x + cardWidth / 2}"
@@ -533,7 +571,7 @@ function createSvg(username, stats) {
         >${escapeXml(trophy.icon)}</text>
 
 
-        <!-- Trophy title -->
+        <!-- Title -->
 
         <text
           x="${x + cardWidth / 2}"
@@ -546,12 +584,12 @@ function createSvg(username, stats) {
         >${escapeXml(trophy.title)}</text>
 
 
-        <!-- Trophy description -->
+        <!-- Description -->
 
         ${descriptionSvg}
 
 
-        <!-- Achievement value -->
+        <!-- Value -->
 
         <text
           x="${x + cardWidth / 2}"
@@ -564,7 +602,7 @@ function createSvg(username, stats) {
         >${value}${isUnlocked ? "+" : ""}</text>
 
 
-        <!-- Value label -->
+        <!-- Label -->
 
         <text
           x="${x + cardWidth / 2}"
@@ -588,7 +626,7 @@ function createSvg(username, stats) {
         />
 
 
-        <!-- Status text -->
+        <!-- Status -->
 
         <text
           x="${x + cardWidth / 2}"
@@ -617,7 +655,7 @@ function createSvg(username, stats) {
   viewBox="0 0 ${svgWidth} ${svgHeight}"
 >
 
-  <!-- Main white background -->
+  <!-- Background -->
 
   <rect
     width="${svgWidth}"
@@ -641,7 +679,7 @@ function createSvg(username, stats) {
   >🏆 GitHub Achievements</text>
 
 
-  <!-- Header slogan -->
+  <!-- Slogan -->
 
   <text
     x="${svgWidth - 40}"
@@ -654,7 +692,7 @@ function createSvg(username, stats) {
   >Small Commits. Big Progress. 🚀</text>
 
 
-  <!-- Trophy cards -->
+  <!-- Achievement Cards -->
 
   ${cards}
 
@@ -685,7 +723,7 @@ export default async function handler(req, res) {
   try {
 
     /*
-     * Username from URL
+     * Get username from query
      */
 
     const username =
@@ -695,7 +733,7 @@ export default async function handler(req, res) {
 
 
     /*
-     * Check GitHub token
+     * Check token
      */
 
     if (!process.env.TOKEN) {
@@ -706,7 +744,7 @@ export default async function handler(req, res) {
 
 
     /*
-     * Fetch GitHub statistics
+     * Fetch GitHub data
      */
 
     const stats =
@@ -715,6 +753,7 @@ export default async function handler(req, res) {
 
     /*
      * Generate SVG
+
      */
 
     const svg =
@@ -740,7 +779,8 @@ export default async function handler(req, res) {
 
 
     /*
-     * Return SVG
+     * Send SVG
+
      */
 
     return res
@@ -750,7 +790,7 @@ export default async function handler(req, res) {
   } catch (error) {
 
     /*
-     * Error response
+     * Error SVG
      */
 
     res.setHeader(
