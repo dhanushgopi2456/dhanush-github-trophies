@@ -1,11 +1,5 @@
 const GITHUB_API = "https://api.github.com/graphql";
 
-/*
-|--------------------------------------------------------------------------
-| GitHub Achievements
-|--------------------------------------------------------------------------
-*/
-
 const TROPHIES = [
   {
     icon: "🚀",
@@ -15,7 +9,6 @@ const TROPHIES = [
     target: 1,
     label: "Repositories",
   },
-
   {
     icon: "💻",
     title: "Code Builder",
@@ -24,7 +17,6 @@ const TROPHIES = [
     target: 10,
     label: "Repositories",
   },
-
   {
     icon: "📊",
     title: "Active Developer",
@@ -33,7 +25,6 @@ const TROPHIES = [
     target: 100,
     label: "Contributions",
   },
-
   {
     icon: "⭐",
     title: "Star Collector",
@@ -42,7 +33,6 @@ const TROPHIES = [
     target: 10,
     label: "Stars",
   },
-
   {
     icon: "🔀",
     title: "Pull Master",
@@ -51,7 +41,6 @@ const TROPHIES = [
     target: 5,
     label: "Pull Requests",
   },
-
   {
     icon: "📝",
     title: "Commit Master",
@@ -60,7 +49,6 @@ const TROPHIES = [
     target: 100,
     label: "Commits",
   },
-
   {
     icon: "🐛",
     title: "Bug Hunter",
@@ -69,7 +57,6 @@ const TROPHIES = [
     target: 10,
     label: "Issues",
   },
-
   {
     icon: "🤝",
     title: "Open Source",
@@ -78,7 +65,6 @@ const TROPHIES = [
     target: 5,
     label: "Repositories",
   },
-
   {
     icon: "🏗️",
     title: "Project Architect",
@@ -87,7 +73,6 @@ const TROPHIES = [
     target: 5,
     label: "Projects",
   },
-
   {
     icon: "🧠",
     title: "Problem Solver",
@@ -96,7 +81,6 @@ const TROPHIES = [
     target: 100,
     label: "Contributions",
   },
-
   {
     icon: "👑",
     title: "Elite Developer",
@@ -105,7 +89,6 @@ const TROPHIES = [
     target: 500,
     label: "Contributions",
   },
-
   {
     icon: "💎",
     title: "Legendary",
@@ -116,13 +99,6 @@ const TROPHIES = [
   },
 ];
 
-
-/*
-|--------------------------------------------------------------------------
-| XML Escape
-|--------------------------------------------------------------------------
-*/
-
 function escapeXml(value) {
   return String(value)
     .replace(/&/g, "&amp;")
@@ -132,17 +108,9 @@ function escapeXml(value) {
     .replace(/'/g, "&apos;");
 }
 
-
-/*
-|--------------------------------------------------------------------------
-| Description Text Wrapping
-|--------------------------------------------------------------------------
-*/
-
 function wrapText(text, maxLength = 28) {
   const words = text.split(" ");
   const lines = [];
-
   let currentLine = "";
 
   for (const word of words) {
@@ -156,7 +124,6 @@ function wrapText(text, maxLength = 28) {
       if (currentLine) {
         lines.push(currentLine);
       }
-
       currentLine = word;
     }
   }
@@ -167,13 +134,6 @@ function wrapText(text, maxLength = 28) {
 
   return lines.slice(0, 2);
 }
-
-
-/*
-|--------------------------------------------------------------------------
-| GitHub GraphQL Request
-|--------------------------------------------------------------------------
-*/
 
 async function githubGraphQL(query, variables) {
   const response = await fetch(GITHUB_API, {
@@ -210,37 +170,20 @@ async function githubGraphQL(query, variables) {
   return data.data;
 }
 
-
-/*
-|--------------------------------------------------------------------------
-| Get GitHub Statistics
-|--------------------------------------------------------------------------
-*/
-
 async function getGitHubStats(username) {
-
   const query = `
     query($login: String!) {
-
       user(login: $login) {
-
         repositories(
           first: 100
           ownerAffiliations: OWNER
           privacy: PUBLIC
         ) {
-
           totalCount
-
           nodes {
             stargazerCount
           }
         }
-
-
-        /*
-         * Actual pull requests authored by this user
-         */
 
         pullRequests(
           first: 1
@@ -249,27 +192,17 @@ async function getGitHubStats(username) {
           totalCount
         }
 
-
-        /*
-         * Contribution statistics
-         */
-
         contributionsCollection {
-
           totalCommitContributions
-
           restrictedContributionsCount
-
 
           issueContributions(first: 1) {
             totalCount
           }
 
-
           repositoryContributions(first: 1) {
             totalCount
           }
-
 
           contributionCalendar {
             totalContributions
@@ -279,117 +212,58 @@ async function getGitHubStats(username) {
     }
   `;
 
-
-  const data = await githubGraphQL(
-    query,
-    {
-      login: username,
-    }
-  );
-
+  const data = await githubGraphQL(query, {
+    login: username,
+  });
 
   const user = data.user;
 
-
   if (!user) {
-    throw new Error(
-      "GitHub user not found"
-    );
+    throw new Error("GitHub user not found");
   }
-
 
   const contributions =
     user.contributionsCollection;
 
-
-  /*
-   * Calculate repository stars
-   */
-
   const stars =
     user.repositories.nodes.reduce(
-      (total, repository) => {
-        return total + repository.stargazerCount;
-      },
+      (total, repository) =>
+        total + repository.stargazerCount,
       0
     );
-
-
-  /*
-   * Calculate commits
-   */
 
   const commits =
     contributions.totalCommitContributions +
     contributions.restrictedContributionsCount;
 
-
-  /*
-   * Actual PR count
-   *
-   * This is NOT the contribution count.
-   * It represents pull requests authored by the user.
-   */
-
   const pullRequests =
     user.pullRequests.totalCount;
 
-
-  /*
-   * Return statistics
-   */
-
   return {
-
     repositories:
       user.repositories.totalCount,
 
     stars,
 
     contributions:
-      contributions
-        .contributionCalendar
+      contributions.contributionCalendar
         .totalContributions,
 
     commits,
 
     issues:
-      contributions
-        .issueContributions
-        .totalCount,
+      contributions.issueContributions.totalCount,
 
     pullRequests,
 
     repositoryContributions:
-      contributions
-        .repositoryContributions
-        .totalCount,
+      contributions.repositoryContributions.totalCount,
   };
 }
 
-
-/*
-|--------------------------------------------------------------------------
-| Create SVG
-|--------------------------------------------------------------------------
-*/
-
 function createSvg(username, stats) {
-
-  /*
-   * SVG dimensions
-   */
-
   const svgWidth = 1500;
   const svgHeight = 650;
-
-
-  /*
-   * Grid
-   *
-   * 6 columns
-   * 2 rows
-   */
 
   const columns = 6;
 
@@ -401,11 +275,6 @@ function createSvg(username, stats) {
 
   const startX = 27;
   const startY = 105;
-
-
-  /*
-   * Colors
-   */
 
   const unlockedGreen = "#087f45";
 
@@ -419,26 +288,11 @@ function createSvg(username, stats) {
   const mutedText = "#475569";
   const grayText = "#64748b";
 
-
-  /*
-   * Build cards
-   */
-
   let cards = "";
 
-
   TROPHIES.forEach((trophy, index) => {
-
-    const column =
-      index % columns;
-
-    const row =
-      Math.floor(index / columns);
-
-
-    /*
-     * Card position
-     */
+    const column = index % columns;
+    const row = Math.floor(index / columns);
 
     const x =
       startX +
@@ -448,29 +302,11 @@ function createSvg(username, stats) {
       startY +
       row * (cardHeight + gapY);
 
-
-    /*
-     * Achievement value
-     */
-
-    const rawValue =
-      trophy.value(stats);
-
     const value =
-      Number(rawValue) || 0;
-
-
-    /*
-     * Achievement status
-     */
+      Number(trophy.value(stats)) || 0;
 
     const isUnlocked =
       value >= trophy.target;
-
-
-    /*
-     * Colors based on status
-     */
 
     const background =
       isUnlocked
@@ -507,21 +343,11 @@ function createSvg(username, stats) {
         ? "✓ Unlocked"
         : "🔒 Locked";
 
-
-    /*
-     * Wrap description
-     */
-
     const descriptionLines =
       wrapText(
         trophy.description,
         28
       );
-
-
-    /*
-     * Generate description
-     */
 
     const descriptionSvg =
       descriptionLines
@@ -539,15 +365,8 @@ function createSvg(username, stats) {
         )
         .join("");
 
-
-    /*
-     * Generate card
-     */
-
     cards += `
       <g>
-
-        <!-- Card -->
 
         <rect
           x="${x}"
@@ -560,18 +379,12 @@ function createSvg(username, stats) {
           stroke-width="2"
         />
 
-
-        <!-- Icon -->
-
         <text
           x="${x + cardWidth / 2}"
           y="${y + 51}"
           text-anchor="middle"
           font-size="38"
         >${escapeXml(trophy.icon)}</text>
-
-
-        <!-- Title -->
 
         <text
           x="${x + cardWidth / 2}"
@@ -583,13 +396,7 @@ function createSvg(username, stats) {
           fill="${titleColor}"
         >${escapeXml(trophy.title)}</text>
 
-
-        <!-- Description -->
-
         ${descriptionSvg}
-
-
-        <!-- Value -->
 
         <text
           x="${x + cardWidth / 2}"
@@ -601,9 +408,6 @@ function createSvg(username, stats) {
           fill="${valueColor}"
         >${value}${isUnlocked ? "+" : ""}</text>
 
-
-        <!-- Label -->
-
         <text
           x="${x + cardWidth / 2}"
           y="${y + 201}"
@@ -613,9 +417,6 @@ function createSvg(username, stats) {
           fill="${grayText}"
         >${escapeXml(trophy.label)}</text>
 
-
-        <!-- Status background -->
-
         <rect
           x="${x + 50}"
           y="${y + 213}"
@@ -624,9 +425,6 @@ function createSvg(username, stats) {
           rx="13"
           fill="${statusBackground}"
         />
-
-
-        <!-- Status -->
 
         <text
           x="${x + cardWidth / 2}"
@@ -642,11 +440,6 @@ function createSvg(username, stats) {
     `;
   });
 
-
-  /*
-   * Complete SVG
-   */
-
   return `
 <svg
   xmlns="http://www.w3.org/2000/svg"
@@ -654,8 +447,6 @@ function createSvg(username, stats) {
   height="${svgHeight}"
   viewBox="0 0 ${svgWidth} ${svgHeight}"
 >
-
-  <!-- Background -->
 
   <rect
     width="${svgWidth}"
@@ -666,9 +457,6 @@ function createSvg(username, stats) {
     stroke-width="2"
   />
 
-
-  <!-- Header -->
-
   <text
     x="38"
     y="55"
@@ -677,9 +465,6 @@ function createSvg(username, stats) {
     font-weight="800"
     fill="${darkText}"
   >🏆 GitHub Achievements</text>
-
-
-  <!-- Slogan -->
 
   <text
     x="${svgWidth - 40}"
@@ -691,13 +476,7 @@ function createSvg(username, stats) {
     fill="${mutedText}"
   >Small Commits. Big Progress. 🚀</text>
 
-
-  <!-- Achievement Cards -->
-
   ${cards}
-
-
-  <!-- Footer -->
 
   <text
     x="38"
@@ -711,30 +490,12 @@ function createSvg(username, stats) {
 `;
 }
 
-
-/*
-|--------------------------------------------------------------------------
-| Vercel API Handler
-|--------------------------------------------------------------------------
-*/
-
 export default async function handler(req, res) {
-
   try {
-
-    /*
-     * Get username from query
-     */
-
     const username =
       req.query?.username ||
       req.query?.user ||
       "dhanushgopi2456";
-
-
-    /*
-     * Check token
-     */
 
     if (!process.env.TOKEN) {
       throw new Error(
@@ -742,30 +503,14 @@ export default async function handler(req, res) {
       );
     }
 
-
-    /*
-     * Fetch GitHub data
-     */
-
     const stats =
       await getGitHubStats(username);
-
-
-    /*
-     * Generate SVG
-
-     */
 
     const svg =
       createSvg(
         username,
         stats
       );
-
-
-    /*
-     * Response headers
-     */
 
     res.setHeader(
       "Content-Type",
@@ -777,27 +522,15 @@ export default async function handler(req, res) {
       "public, max-age=3600, s-maxage=3600"
     );
 
-
-    /*
-     * Send SVG
-
-     */
-
     return res
       .status(200)
       .send(svg);
 
   } catch (error) {
-
-    /*
-     * Error SVG
-     */
-
     res.setHeader(
       "Content-Type",
       "image/svg+xml"
     );
-
 
     return res
       .status(500)
