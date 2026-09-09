@@ -1,5 +1,11 @@
 const GITHUB_API = "https://api.github.com/graphql";
 
+/*
+|--------------------------------------------------------------------------
+| GitHub Achievement Definitions
+|--------------------------------------------------------------------------
+*/
+
 const TROPHIES = [
   {
     icon: "🚀",
@@ -9,6 +15,7 @@ const TROPHIES = [
     target: 1,
     label: "Repositories",
   },
+
   {
     icon: "💻",
     title: "Code Builder",
@@ -17,6 +24,7 @@ const TROPHIES = [
     target: 10,
     label: "Repositories",
   },
+
   {
     icon: "📊",
     title: "Active Developer",
@@ -25,6 +33,7 @@ const TROPHIES = [
     target: 100,
     label: "Contributions",
   },
+
   {
     icon: "⭐",
     title: "Star Collector",
@@ -33,6 +42,7 @@ const TROPHIES = [
     target: 10,
     label: "Stars",
   },
+
   {
     icon: "🔀",
     title: "Pull Master",
@@ -41,14 +51,16 @@ const TROPHIES = [
     target: 10,
     label: "Pull Requests",
   },
+
   {
-    icon: "💬",
-    title: "Community Contributor",
-    description: "Participated in GitHub discussions",
-    value: (s) => s.discussions,
-    target: 5,
-    label: "Discussions",
+    icon: "📝",
+    title: "Commit Master",
+    description: "Made consistent code contributions",
+    value: (s) => s.commits,
+    target: 100,
+    label: "Commits",
   },
+
   {
     icon: "🐛",
     title: "Bug Hunter",
@@ -57,14 +69,16 @@ const TROPHIES = [
     target: 10,
     label: "Issues",
   },
+
   {
     icon: "🤝",
     title: "Open Source",
-    description: "Contributed to open-source repositories",
-    value: (s) => s.pullRequests,
+    description: "Contributed across different repositories",
+    value: (s) => s.repositoryContributions,
     target: 5,
-    label: "PR Contributions",
+    label: "Repositories",
   },
+
   {
     icon: "🏗️",
     title: "Project Architect",
@@ -73,6 +87,7 @@ const TROPHIES = [
     target: 5,
     label: "Projects",
   },
+
   {
     icon: "🧠",
     title: "Problem Solver",
@@ -81,6 +96,7 @@ const TROPHIES = [
     target: 100,
     label: "Contributions",
   },
+
   {
     icon: "👑",
     title: "Elite Developer",
@@ -89,6 +105,7 @@ const TROPHIES = [
     target: 500,
     label: "Contributions",
   },
+
   {
     icon: "💎",
     title: "Legendary",
@@ -99,6 +116,13 @@ const TROPHIES = [
   },
 ];
 
+
+/*
+|--------------------------------------------------------------------------
+| XML Escape Helper
+|--------------------------------------------------------------------------
+*/
+
 function escapeXml(value) {
   return String(value)
     .replace(/&/g, "&amp;")
@@ -108,43 +132,62 @@ function escapeXml(value) {
     .replace(/'/g, "&apos;");
 }
 
+
 /*
- * Break text into short lines so SVG text never overlaps
- * neighboring cards.
- */
-function wrapText(text, maxLength = 30) {
+|--------------------------------------------------------------------------
+| Text Wrapping
+|--------------------------------------------------------------------------
+|
+| Prevents long descriptions from touching neighboring cards.
+|
+*/
+
+function wrapText(text, maxLength = 29) {
   const words = text.split(" ");
   const lines = [];
-  let current = "";
+
+  let currentLine = "";
 
   for (const word of words) {
-    const test = current ? `${current} ${word}` : word;
+    const testLine = currentLine
+      ? `${currentLine} ${word}`
+      : word;
 
-    if (test.length <= maxLength) {
-      current = test;
+    if (testLine.length <= maxLength) {
+      currentLine = testLine;
     } else {
-      if (current) {
-        lines.push(current);
+      if (currentLine) {
+        lines.push(currentLine);
       }
-      current = word;
+
+      currentLine = word;
     }
   }
 
-  if (current) {
-    lines.push(current);
+  if (currentLine) {
+    lines.push(currentLine);
   }
 
   return lines.slice(0, 2);
 }
 
+
+/*
+|--------------------------------------------------------------------------
+| GitHub GraphQL Request
+|--------------------------------------------------------------------------
+*/
+
 async function githubGraphQL(query, variables) {
   const response = await fetch(GITHUB_API, {
     method: "POST",
+
     headers: {
       Authorization: `Bearer ${process.env.TOKEN}`,
       "Content-Type": "application/json",
       Accept: "application/vnd.github+json",
     },
+
     body: JSON.stringify({
       query,
       variables,
@@ -152,35 +195,52 @@ async function githubGraphQL(query, variables) {
   });
 
   if (!response.ok) {
-    throw new Error(`GitHub API returned ${response.status}`);
+    throw new Error(
+      `GitHub API returned ${response.status}`
+    );
   }
 
   const data = await response.json();
 
-  if (data.errors) {
-    throw new Error(data.errors[0].message);
+  if (data.errors && data.errors.length > 0) {
+    throw new Error(
+      data.errors
+        .map((error) => error.message)
+        .join(" | ")
+    );
   }
 
   return data.data;
 }
 
+
+/*
+|--------------------------------------------------------------------------
+| Get GitHub Statistics
+|--------------------------------------------------------------------------
+*/
+
 async function getGitHubStats(username) {
   const query = `
     query($login: String!) {
       user(login: $login) {
+
         repositories(
           first: 100
           ownerAffiliations: OWNER
           privacy: PUBLIC
         ) {
           totalCount
+
           nodes {
             stargazerCount
           }
         }
 
         contributionsCollection {
+
           totalCommitContributions
+
           restrictedContributionsCount
 
           issueContributions(first: 1) {
@@ -195,10 +255,6 @@ async function getGitHubStats(username) {
             totalCount
           }
 
-          discussionContributions(first: 1) {
-            totalCount
-          }
-
           contributionCalendar {
             totalContributions
           }
@@ -207,63 +263,98 @@ async function getGitHubStats(username) {
     }
   `;
 
-  const data = await githubGraphQL(query, {
-    login: username,
-  });
+  const data = await githubGraphQL(
+    query,
+    {
+      login: username,
+    }
+  );
 
   const user = data.user;
 
   if (!user) {
-    throw new Error("GitHub user not found");
+    throw new Error(
+      "GitHub user not found"
+    );
   }
 
-  const contributions = user.contributionsCollection;
+  const contributions =
+    user.contributionsCollection;
 
-  const stars = user.repositories.nodes.reduce(
-    (total, repo) => total + repo.stargazerCount,
-    0
-  );
+
+  /*
+   * Calculate total stars
+   */
+
+  const stars =
+    user.repositories.nodes.reduce(
+      (total, repository) =>
+        total + repository.stargazerCount,
+      0
+    );
+
+
+  /*
+   * Calculate commits
+   */
+
+  const commits =
+    contributions.totalCommitContributions +
+    contributions.restrictedContributionsCount;
+
+
+  /*
+   * Return all statistics
+   */
 
   return {
-    repositories: user.repositories.totalCount,
+    repositories:
+      user.repositories.totalCount,
 
     stars,
 
     contributions:
-      contributions.contributionCalendar.totalContributions,
+      contributions.contributionCalendar
+        .totalContributions,
 
-    commits:
-      contributions.totalCommitContributions +
-      contributions.restrictedContributionsCount,
+    commits,
 
     issues:
-      contributions.issueContributions.totalCount,
+      contributions.issueContributions
+        .totalCount,
 
     pullRequests:
-      contributions.pullRequestContributions.totalCount,
-
-    discussions:
-      contributions.discussionContributions.totalCount,
+      contributions.pullRequestContributions
+        .totalCount,
 
     repositoryContributions:
-      contributions.repositoryContributions.totalCount,
+      contributions.repositoryContributions
+        .totalCount,
   };
 }
 
+
+/*
+|--------------------------------------------------------------------------
+| Create Trophy SVG
+|--------------------------------------------------------------------------
+*/
+
 function createSvg(username, stats) {
+
   /*
-   * FIXED LAYOUT
-   *
-   * 6 columns × 2 rows
-   * Smaller cards + proper gaps
-   * Prevents the right-side clipping/overlap
+   * Overall SVG dimensions
    */
 
   const svgWidth = 1500;
   const svgHeight = 650;
 
+
+  /*
+   * Grid configuration
+   */
+
   const columns = 6;
-  const rows = 2;
 
   const cardWidth = 220;
   const cardHeight = 245;
@@ -274,69 +365,151 @@ function createSvg(username, stats) {
   const startX = 27;
   const startY = 105;
 
-  const unlockedColor = "#087f45";
+
+  /*
+   * Colors
+   */
+
+  const unlockedGreen = "#087f45";
+
+  const unlockedBackground = "#f0fdf4";
+  const unlockedBorder = "#86efac";
+
+  const lockedBackground = "#f8fafc";
+  const lockedBorder = "#d1d5db";
+
+  const darkText = "#172033";
+  const mutedText = "#475569";
+  const grayText = "#64748b";
+
+
+  /*
+   * Trophy card SVG
+   */
 
   let cards = "";
 
+
   TROPHIES.forEach((trophy, index) => {
+
     const column = index % columns;
-    const row = Math.floor(index / columns);
 
-    const x = startX + column * (cardWidth + gapX);
-    const y = startY + row * (cardHeight + gapY);
+    const row =
+      Math.floor(index / columns);
 
-    const value = Number(trophy.value(stats)) || 0;
 
-    const isUnlocked = value >= trophy.target;
+    /*
+     * Calculate card position
+     */
 
-    const background = isUnlocked
-      ? "#f0fdf4"
-      : "#f8fafc";
+    const x =
+      startX +
+      column * (cardWidth + gapX);
 
-    const border = isUnlocked
-      ? "#86efac"
-      : "#d1d5db";
+    const y =
+      startY +
+      row * (cardHeight + gapY);
 
-    const titleColor = isUnlocked
-      ? "#172033"
-      : "#64748b";
 
-    const valueColor = isUnlocked
-      ? unlockedColor
-      : "#64748b";
+    /*
+     * Current statistic
+     */
 
-    const statusBackground = isUnlocked
-      ? "#dcfce7"
-      : "#e5e7eb";
+    const rawValue =
+      trophy.value(stats);
 
-    const statusText = isUnlocked
-      ? "✓ Unlocked"
-      : "🔒 Locked";
+    const value =
+      Number(rawValue) || 0;
 
-    const descriptionLines = wrapText(
-      trophy.description,
-      30
-    );
 
-    const descriptionSvg = descriptionLines
-      .map(
-        (line, lineIndex) => `
-          <text
-            x="${x + cardWidth / 2}"
-            y="${y + 125 + lineIndex * 17}"
-            text-anchor="middle"
-            font-family="Arial, sans-serif"
-            font-size="12"
-            fill="#475569"
-          >${escapeXml(line)}</text>
-        `
-      )
-      .join("");
+    /*
+     * Achievement status
+     */
+
+    const isUnlocked =
+      value >= trophy.target;
+
+
+    /*
+     * Dynamic colors
+     */
+
+    const background =
+      isUnlocked
+        ? unlockedBackground
+        : lockedBackground;
+
+    const border =
+      isUnlocked
+        ? unlockedBorder
+        : lockedBorder;
+
+    const titleColor =
+      isUnlocked
+        ? darkText
+        : grayText;
+
+    const valueColor =
+      isUnlocked
+        ? unlockedGreen
+        : grayText;
+
+    const statusBackground =
+      isUnlocked
+        ? "#dcfce7"
+        : "#e5e7eb";
+
+    const statusColor =
+      isUnlocked
+        ? unlockedGreen
+        : grayText;
+
+    const statusText =
+      isUnlocked
+        ? "✓ Unlocked"
+        : "🔒 Locked";
+
+
+    /*
+     * Wrap description
+     */
+
+    const descriptionLines =
+      wrapText(
+        trophy.description,
+        29
+      );
+
+
+    /*
+     * Generate description SVG
+     */
+
+    const descriptionSvg =
+      descriptionLines
+        .map(
+          (line, lineIndex) => `
+            <text
+              x="${x + cardWidth / 2}"
+              y="${y + 126 + lineIndex * 17}"
+              text-anchor="middle"
+              font-family="Arial, sans-serif"
+              font-size="12"
+              fill="${mutedText}"
+            >${escapeXml(line)}</text>
+          `
+        )
+        .join("");
+
+
+    /*
+     * Generate complete card
+     */
 
     cards += `
       <g>
 
-        <!-- Card -->
+        <!-- Card background -->
 
         <rect
           x="${x}"
@@ -349,20 +522,22 @@ function createSvg(username, stats) {
           stroke-width="2"
         />
 
-        <!-- Icon -->
+
+        <!-- Trophy icon -->
 
         <text
           x="${x + cardWidth / 2}"
-          y="${y + 50}"
+          y="${y + 51}"
           text-anchor="middle"
           font-size="38"
         >${escapeXml(trophy.icon)}</text>
 
-        <!-- Title -->
+
+        <!-- Trophy title -->
 
         <text
           x="${x + cardWidth / 2}"
-          y="${y + 91}"
+          y="${y + 92}"
           text-anchor="middle"
           font-family="Arial, sans-serif"
           font-size="17"
@@ -370,15 +545,17 @@ function createSvg(username, stats) {
           fill="${titleColor}"
         >${escapeXml(trophy.title)}</text>
 
-        <!-- Description -->
+
+        <!-- Trophy description -->
 
         ${descriptionSvg}
 
-        <!-- Value -->
+
+        <!-- Achievement value -->
 
         <text
           x="${x + cardWidth / 2}"
-          y="${y + 178}"
+          y="${y + 179}"
           text-anchor="middle"
           font-family="Arial, sans-serif"
           font-size="30"
@@ -386,7 +563,8 @@ function createSvg(username, stats) {
           fill="${valueColor}"
         >${value}${isUnlocked ? "+" : ""}</text>
 
-        <!-- Label -->
+
+        <!-- Value label -->
 
         <text
           x="${x + cardWidth / 2}"
@@ -394,10 +572,11 @@ function createSvg(username, stats) {
           text-anchor="middle"
           font-family="Arial, sans-serif"
           font-size="12"
-          fill="#64748b"
+          fill="${grayText}"
         >${escapeXml(trophy.label)}</text>
 
-        <!-- Status -->
+
+        <!-- Status background -->
 
         <rect
           x="${x + 50}"
@@ -408,6 +587,9 @@ function createSvg(username, stats) {
           fill="${statusBackground}"
         />
 
+
+        <!-- Status text -->
+
         <text
           x="${x + cardWidth / 2}"
           y="${y + 232}"
@@ -415,12 +597,17 @@ function createSvg(username, stats) {
           font-family="Arial, sans-serif"
           font-size="12"
           font-weight="700"
-          fill="${isUnlocked ? unlockedColor : "#64748b"}"
+          fill="${statusColor}"
         >${escapeXml(statusText)}</text>
 
       </g>
     `;
   });
+
+
+  /*
+   * Complete SVG
+   */
 
   return `
 <svg
@@ -430,7 +617,7 @@ function createSvg(username, stats) {
   viewBox="0 0 ${svgWidth} ${svgHeight}"
 >
 
-  <!-- Main Background -->
+  <!-- Main white background -->
 
   <rect
     width="${svgWidth}"
@@ -441,6 +628,7 @@ function createSvg(username, stats) {
     stroke-width="2"
   />
 
+
   <!-- Header -->
 
   <text
@@ -449,8 +637,11 @@ function createSvg(username, stats) {
     font-family="Arial, sans-serif"
     font-size="30"
     font-weight="800"
-    fill="#172033"
+    fill="${darkText}"
   >🏆 GitHub Achievements</text>
+
+
+  <!-- Header slogan -->
 
   <text
     x="${svgWidth - 40}"
@@ -459,12 +650,14 @@ function createSvg(username, stats) {
     font-family="Arial, sans-serif"
     font-size="16"
     font-style="italic"
-    fill="#475569"
+    fill="${mutedText}"
   >Small Commits. Big Progress. 🚀</text>
 
-  <!-- Trophy Cards -->
+
+  <!-- Trophy cards -->
 
   ${cards}
+
 
   <!-- Footer -->
 
@@ -473,19 +666,37 @@ function createSvg(username, stats) {
     y="630"
     font-family="Arial, sans-serif"
     font-size="13"
-    fill="#64748b"
+    fill="${grayText}"
   >${escapeXml(username)} • Automatically generated from GitHub activity</text>
 
 </svg>
 `;
 }
 
+
+/*
+|--------------------------------------------------------------------------
+| Vercel API Handler
+|--------------------------------------------------------------------------
+*/
+
 export default async function handler(req, res) {
+
   try {
+
+    /*
+     * Username from URL
+     */
+
     const username =
       req.query?.username ||
       req.query?.user ||
       "dhanushgopi2456";
+
+
+    /*
+     * Check GitHub token
+     */
 
     if (!process.env.TOKEN) {
       throw new Error(
@@ -493,12 +704,29 @@ export default async function handler(req, res) {
       );
     }
 
-    const stats = await getGitHubStats(username);
 
-    const svg = createSvg(
-      username,
-      stats
-    );
+    /*
+     * Fetch GitHub statistics
+     */
+
+    const stats =
+      await getGitHubStats(username);
+
+
+    /*
+     * Generate SVG
+     */
+
+    const svg =
+      createSvg(
+        username,
+        stats
+      );
+
+
+    /*
+     * Response headers
+     */
 
     res.setHeader(
       "Content-Type",
@@ -510,16 +738,26 @@ export default async function handler(req, res) {
       "public, max-age=3600, s-maxage=3600"
     );
 
+
+    /*
+     * Return SVG
+     */
+
     return res
       .status(200)
       .send(svg);
 
   } catch (error) {
 
+    /*
+     * Error response
+     */
+
     res.setHeader(
       "Content-Type",
       "image/svg+xml"
     );
+
 
     return res
       .status(500)
@@ -539,7 +777,7 @@ export default async function handler(req, res) {
           <text
             x="30"
             y="70"
-            font-family="Arial"
+            font-family="Arial, sans-serif"
             font-size="24"
             font-weight="bold"
             fill="#dc2626"
@@ -550,7 +788,7 @@ export default async function handler(req, res) {
           <text
             x="30"
             y="115"
-            font-family="Arial"
+            font-family="Arial, sans-serif"
             font-size="16"
             fill="#475569"
           >
